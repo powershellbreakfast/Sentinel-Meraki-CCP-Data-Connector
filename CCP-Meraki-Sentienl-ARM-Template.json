@@ -4,35 +4,60 @@
     "parameters": {
         "workspaceName": {
             "type": "string",
-            "defaultValue": ""
+            "defaultValue": "",
+            "metadata": {
+                "description":"This is the Name of your Log Workspace that the Data connecter will be placed in and the logs shipped to."
+            }
         },
         "networkName": {
             "type": "string",
-            "defaultValue": ""
+            "defaultValue": "",
+            "metadata": {
+                "description":"This is a Friendly Name to make the Data connector Easy to identify later on. It is recommended to use the same name as the name of your network in Meraki Dashboard"
+            }
         },
         "networkId": {
             "type": "string",
-            "defaultValue": ""
+            "defaultValue": "",
+            "metadata": {
+                "description":"This is a unique Idenifer for the network that event logs will be pulled from. it has the format of L_123456789123456789 or N_123456789123456789 can be found by querying the Meraki API with the included Script"
+            }
+        },
+        "productType": {
+            "type": "string",
+            "defaultValue": "wireless",
+            "allowedValues": [
+                "wireless",
+                "appliance",
+                "switch",
+                "systemsManager",
+                "camera",
+                "cellularGateway"
+            ],
+            "metadata": {
+                "description":"This parameter is required for networks with multiple device types. Valid types are wireless, appliance, switch, systemsManager, camera, and cellularGateway"
+            }
+            
         }
     },
     "resources": [
         {
-            "id": "[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/',resourceGroup().name,'/providers/Microsoft.OperationalInsights/workspaces/',parameters('workspaceName'),'/providers/Microsoft.SecurityInsights/dataConnectors/',guid(subscription().subscriptionId,parameters('networkId')))]",
-            "name": "[concat(parameters('workspaceName'),'/Microsoft.SecurityInsights/',guid(subscription().subscriptionId,parameters('networkId')))]",
+            "id": "[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/',resourceGroup().name,'/providers/Microsoft.OperationalInsights/workspaces/',parameters('workspaceName'),'/providers/Microsoft.SecurityInsights/dataConnectors/',guid(subscription().subscriptionId,parameters('networkId'),parameters('productType')))]",
+            "name": "[concat(parameters('workspaceName'),'/Microsoft.SecurityInsights/',guid(subscription().subscriptionId,parameters('networkId'),parameters('productType')))]",
             "apiVersion": "2021-03-01-preview",
             "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
             "kind": "APIPolling",
             "properties": {
                 "connectorUiConfig": {
-                    "id":"[concat('meraki_api_connector_',parameters('networkId'))]",
-                    "title": "[concat('Meraki Connector v1.2 for ',parameters('networkName'))]",
+                    "id":"[concat('meraki_api_connector_',parameters('networkId'),'_',parameters('productType'))]",
+                    "title": "[concat('Meraki Connector v1.3 for ',parameters('networkName'),' ',parameters('productType'))]",
                     "publisher": "Luke England",
                     "descriptionMarkdown": "The Meraki Log Connector is a Codeless HTTPS API Connector built to grab logs from meraki's API for a specific Network.",
-                    "graphQueriesTableName": "Meraki_Events_CL",
+                    "graphQueriesTableName": "[concat(parameters('productType'),'_Meraki_Events_CL')]",
                     "graphQueries": [{
                             "metricName": "Total data received",
                             "legend": "DATATYPE_NAME",
-                            "baseQuery": "{{graphQueriesTableName}}"
+                            "baseQuery": "[concat('{{graphQueriesTableName}} | where networkId_s == “',parameters('networkId'),'”')]"
                         }
                     ],
                     "sampleQueries": [{
@@ -99,6 +124,9 @@
                         "request": {
                             "apiEndpoint":"[concat('https://api.meraki.com/api/v1/networks/',parameters('networkId'),'/events')]",
                             "httpMethod":"Get",
+                            "queryParameters":{
+                                "productType":"[parameters('productType')]"
+                            },
                             "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
                             "startTimeAttributeName": "startingAfter",
                             "queryWindowInMin": 5,
